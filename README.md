@@ -1,36 +1,43 @@
-# Product/User Behavior Analytics & Retention Analysis
+# Product/User Behavior Analytics Dashboard
 
-A product analytics project focused on why users leave, where funnels break, and how retention changes by cohort, plan, and acquisition channel.
+A professional user behavior analytics dashboard built on the real UCI **Online Shoppers Purchasing Intention** dataset.
 
-## What It Demonstrates
+## Dataset
 
-- Funnel analysis from signup to purchase.
-- Cohort retention analysis by signup month.
-- Churn risk analysis from inactivity windows.
-- User journey analysis from event sequences.
-- Python, Pandas, Seaborn, SQL, and dashboard storytelling.
+Source: UCI Machine Learning Repository, Online Shoppers Purchasing Intention dataset.
+
+The data contains ecommerce browsing sessions with page counts, page durations, bounce rates, exit rates, page values, visitor type, traffic type, weekend flag, and purchase outcome.
+
+Important note: this dataset is session-level and does not include persistent user IDs or event timestamps. Because of that, the dashboard focuses on conversion behavior, engagement diagnostics, and funnel proxy analysis instead of pretending to perform true cohort retention.
+
+## Features
+
+- Conversion rate, sessions, conversions, average pages, duration, bounce rate, and exit rate.
+- Funnel proxy from all sessions to product browsing, high engagement, page value, and conversion.
+- Visitor type, traffic type, engagement band, and month-level analysis.
+- Behavior diagnostics for high-exit and high-bounce sessions.
+- SQL examples for analyst-style KPI validation.
 
 ## Run Locally
 
 ```powershell
 pip install -r requirements.txt
-python .\scripts\seed_data.py
 streamlit run app.py
 ```
 
-The app automatically creates `data/user_events.csv` if it does not exist.
+## Portfolio Story
 
-## Analyst Questions Answered
+This project answers product and growth questions:
 
-- Where are users dropping off in the funnel?
-- Which cohorts retain better?
-- Which plans or channels have churn risk?
-- What journeys are most common before purchase?
+- Which visitor types convert best?
+- Which traffic types bring low-quality sessions?
+- How do page value, bounce rate, and exit rate relate to conversion?
+- Where does the shopping journey appear to lose intent?
 
-## Files
+## Project Files
 
-- `app.py` - Streamlit analytics dashboard.
-- `scripts/seed_data.py` - deterministic product event dataset generator.
-- `sql/retention_queries.sql` - reusable SQL analysis examples.
-- `data/user_events.csv` - generated event-level data.
+- `app.py` - Streamlit product analytics dashboard.
+- `data/online_shoppers_intention.csv` - cleaned real session dataset.
+- `sql/retention_queries.sql` - SQL conversion and behavior queries.
+- `scripts/seed_data.py` - fallback synthetic event generator kept for reproducibility.
 

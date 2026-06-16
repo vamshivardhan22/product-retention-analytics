@@ -5,118 +5,139 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 
-from scripts.seed_data import OUTPUT, main as seed_data
+
+DATA_PATH = Path("data/online_shoppers_intention.csv")
+
+st.set_page_config(page_title="Product Behavior Analytics", layout="wide")
 
 
-st.set_page_config(page_title="Product Retention Analytics", layout="wide")
-
-
-FUNNEL = ["signup", "session_start", "view_feature", "activation", "checkout_start", "purchase"]
-
-
-def ensure_data():
-    if not OUTPUT.exists():
-        seed_data()
-    return pd.read_csv(OUTPUT, parse_dates=["event_time"])
-
-
-def build_funnel(events):
-    base = events.groupby("event_name")["user_id"].nunique().reindex(FUNNEL).fillna(0).astype(int)
-    funnel = base.reset_index()
-    funnel.columns = ["stage", "users"]
-    funnel["conversion_from_signup"] = funnel["users"] / max(funnel.loc[0, "users"], 1)
-    funnel["step_conversion"] = funnel["users"] / funnel["users"].shift(1).replace(0, pd.NA)
-    funnel.loc[0, "step_conversion"] = 1
-    return funnel
-
-
-def build_retention(events):
-    first_seen = events.groupby("user_id")["event_time"].min().rename("signup_time")
-    active = events[events["event_name"].isin(["session_start", "activation", "purchase"])].merge(first_seen, on="user_id")
-    active["cohort"] = active["signup_time"].dt.to_period("M").astype(str)
-    active["period"] = ((active["event_time"] - active["signup_time"]).dt.days // 30).clip(lower=0, upper=5)
-    cohort = active.groupby(["cohort", "period"])["user_id"].nunique().unstack(fill_value=0)
-    cohort_size = cohort[0].replace(0, pd.NA)
-    retention = cohort.divide(cohort_size, axis=0).fillna(0)
-    return retention
-
-
-def churn_table(events):
-    last_seen = events.groupby("user_id").agg(
-        last_seen=("event_time", "max"),
-        plan=("plan", "last"),
-        channel=("acquisition_channel", "last"),
+@st.cache_data
+def load_sessions():
+    data = pd.read_csv(DATA_PATH)
+    bool_cols = ["weekend", "revenue"]
+    for col in bool_cols:
+        data[col] = data[col].astype(bool)
+    data["total_pages"] = data["administrative"] + data["informational"] + data["productrelated"]
+    data["total_duration"] = (
+        data["administrative_duration"]
+        + data["informational_duration"]
+        + data["productrelated_duration"]
     )
-    as_of = events["event_time"].max()
-    last_seen["days_since_seen"] = (as_of - last_seen["last_seen"]).dt.days
-    last_seen["churn_risk"] = pd.cut(
-        last_seen["days_since_seen"],
-        bins=[-1, 14, 30, 60, 999],
-        labels=["Healthy", "Watch", "At Risk", "Churned"],
+    data["engagement_band"] = pd.cut(
+        data["total_pages"],
+        bins=[-1, 2, 8, 20, 999],
+        labels=["Low", "Medium", "High", "Power"],
     )
-    return last_seen.reset_index()
+    return data
 
 
-events = ensure_data()
-st.title("Product/User Behavior Analytics & Retention Analysis")
-st.caption("Funnel, cohort, churn, retention, and journey analytics for product and growth analyst portfolios.")
+def rate(value):
+    return f"{value:.2%}"
+
+
+def conversion_summary(data, group_col):
+    return (
+        data.groupby(group_col, observed=True)
+        .agg(
+            sessions=("session_id", "count"),
+            conversions=("revenue", "sum"),
+            conversion_rate=("revenue", "mean"),
+            avg_page_value=("pagevalues", "mean"),
+            avg_exit_rate=("exitrates", "mean"),
+            avg_bounce_rate=("bouncerates", "mean"),
+        )
+        .reset_index()
+        .sort_values("conversion_rate", ascending=False)
+    )
+
+
+sessions = load_sessions()
+
+st.title("Product/User Behavior Analytics Dashboard")
+st.caption(
+    "Built on the UCI Online Shoppers Purchasing Intention dataset. "
+    "This session-level dataset is ideal for conversion behavior, funnel proxy, traffic analysis, and engagement diagnostics."
+)
 
 with st.sidebar:
     st.header("Filters")
-    channels = st.multiselect("Acquisition channel", sorted(events["acquisition_channel"].unique()), default=sorted(events["acquisition_channel"].unique()))
-    plans = st.multiselect("Plan", sorted(events["plan"].unique()), default=sorted(events["plan"].unique()))
+    months = st.multiselect("Month", sorted(sessions["month"].unique()), default=sorted(sessions["month"].unique()))
+    visitor_types = st.multiselect(
+        "Visitor type",
+        sorted(sessions["visitortype"].unique()),
+        default=sorted(sessions["visitortype"].unique()),
+    )
+    weekend_choice = st.selectbox("Weekend", ["All", "Weekend only", "Weekday only"])
 
-filtered = events[events["acquisition_channel"].isin(channels) & events["plan"].isin(plans)]
-funnel = build_funnel(filtered)
-retention = build_retention(filtered)
-churn = churn_table(filtered)
+filtered = sessions[sessions["month"].isin(months) & sessions["visitortype"].isin(visitor_types)]
+if weekend_choice == "Weekend only":
+    filtered = filtered[filtered["weekend"]]
+elif weekend_choice == "Weekday only":
+    filtered = filtered[~filtered["weekend"]]
 
-d7 = retention[retention.columns[retention.columns >= 0]].iloc[:, :1].mean().iloc[0] if not retention.empty else 0
-d30 = retention[1].mean() if 1 in retention.columns else 0
-purchase_users = filtered[filtered["event_name"] == "purchase"]["user_id"].nunique()
-total_users = filtered["user_id"].nunique()
-churn_rate = (churn["churn_risk"].eq("Churned").mean() * 100) if len(churn) else 0
+sessions_count = len(filtered)
+conversions = int(filtered["revenue"].sum())
+conversion_rate = filtered["revenue"].mean() if sessions_count else 0
+avg_pages = filtered["total_pages"].mean() if sessions_count else 0
+avg_duration = filtered["total_duration"].mean() if sessions_count else 0
+bounce_rate = filtered["bouncerates"].mean() if sessions_count else 0
+exit_rate = filtered["exitrates"].mean() if sessions_count else 0
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Users", f"{total_users:,}")
-k2.metric("Purchasers", f"{purchase_users:,}")
-k3.metric("Month 1 Retention", f"{d30:.1%}")
-k4.metric("Churned Users", f"{churn_rate:.1f}%")
+k1, k2, k3, k4, k5, k6 = st.columns(6)
+k1.metric("Sessions", f"{sessions_count:,}")
+k2.metric("Conversions", f"{conversions:,}")
+k3.metric("Conversion Rate", rate(conversion_rate))
+k4.metric("Avg Pages", f"{avg_pages:.1f}")
+k5.metric("Avg Duration", f"{avg_duration:,.0f}s")
+k6.metric("Bounce Rate", rate(bounce_rate))
 
-tab_funnel, tab_cohort, tab_churn, tab_journey, tab_sql = st.tabs(["Funnel", "Cohorts", "Churn", "Journey", "SQL"])
+tab_funnel, tab_segments, tab_behavior, tab_sql = st.tabs(
+    ["Funnel Proxy", "Segments", "Behavior Diagnostics", "SQL"]
+)
 
 with tab_funnel:
-    st.subheader("Product Funnel")
-    st.dataframe(funnel, use_container_width=True, hide_index=True)
-    st.bar_chart(funnel, x="stage", y="users", height=330)
+    st.subheader("Session Funnel Proxy")
+    funnel = pd.DataFrame(
+        [
+            {"stage": "All Sessions", "sessions": sessions_count},
+            {"stage": "Product Browsing", "sessions": int((filtered["productrelated"] > 0).sum())},
+            {"stage": "High Engagement", "sessions": int((filtered["total_pages"] >= 8).sum())},
+            {"stage": "Page Value Present", "sessions": int((filtered["pagevalues"] > 0).sum())},
+            {"stage": "Converted", "sessions": conversions},
+        ]
+    )
+    funnel["rate_from_total"] = funnel["sessions"] / max(sessions_count, 1)
+    st.dataframe(funnel, width="stretch", hide_index=True)
+    st.bar_chart(funnel, x="stage", y="sessions", height=330)
 
-with tab_cohort:
-    st.subheader("Cohort Retention Matrix")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.heatmap(retention, annot=True, fmt=".0%", cmap="YlGnBu", ax=ax)
-    ax.set_xlabel("Months Since Signup")
-    ax.set_ylabel("Signup Cohort")
+with tab_segments:
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Conversion by Visitor Type")
+        st.dataframe(conversion_summary(filtered, "visitortype"), width="stretch", hide_index=True)
+    with right:
+        st.subheader("Conversion by Traffic Type")
+        st.dataframe(conversion_summary(filtered, "traffictype"), width="stretch", hide_index=True)
+
+    st.subheader("Conversion by Engagement Band")
+    st.dataframe(conversion_summary(filtered, "engagement_band"), width="stretch", hide_index=True)
+
+with tab_behavior:
+    st.subheader("Behavior Drivers")
+    fig, ax = plt.subplots(figsize=(9, 5))
+    sns.boxplot(data=filtered, x="revenue", y="pagevalues", ax=ax)
+    ax.set_xlabel("Converted")
+    ax.set_ylabel("Page Value")
+    ax.set_title("Page Value Distribution by Conversion Outcome")
     st.pyplot(fig, clear_figure=True)
 
-with tab_churn:
-    st.subheader("Churn Risk by Plan")
-    risk = churn.groupby(["plan", "churn_risk"], observed=True)["user_id"].count().reset_index()
-    st.dataframe(risk, use_container_width=True, hide_index=True)
-    st.subheader("Users Needing Attention")
-    st.dataframe(churn.sort_values("days_since_seen", ascending=False).head(50), use_container_width=True, hide_index=True)
+    st.subheader("Month-Level Conversion Trend")
+    month = conversion_summary(filtered, "month")
+    st.dataframe(month, width="stretch", hide_index=True)
 
-with tab_journey:
-    st.subheader("Common User Journey Paths")
-    journeys = (
-        filtered.sort_values("event_time")
-        .groupby("user_id")["event_name"]
-        .apply(lambda x: " > ".join(pd.Series(x).drop_duplicates().head(6)))
-        .value_counts()
-        .head(12)
-        .reset_index()
-    )
-    journeys.columns = ["journey_path", "users"]
-    st.dataframe(journeys, use_container_width=True, hide_index=True)
+    st.subheader("High Exit / High Bounce Sessions")
+    risk = filtered.sort_values(["exitrates", "bouncerates"], ascending=False).head(50)
+    st.dataframe(risk, width="stretch", hide_index=True)
 
 with tab_sql:
     st.subheader("SQL Analysis Examples")

@@ -1,20 +1,27 @@
--- Product analytics SQL examples
+-- Product behavior analytics SQL examples for Online Shoppers Purchasing Intention.
+-- This is session-level data, so analysis focuses on conversion behavior and engagement.
 
--- Funnel counts
-SELECT event_name, COUNT(DISTINCT user_id) AS users
-FROM events
-WHERE event_name IN ('signup', 'session_start', 'view_feature', 'activation', 'checkout_start', 'purchase')
-GROUP BY event_name;
+SELECT
+  COUNT(*) AS sessions,
+  SUM(CASE WHEN revenue = 1 THEN 1 ELSE 0 END) AS conversions,
+  ROUND(100.0 * AVG(revenue), 2) AS conversion_rate
+FROM sessions;
 
--- Monthly acquisition cohorts
-SELECT strftime('%Y-%m', MIN(event_time)) AS signup_month, COUNT(DISTINCT user_id) AS users
-FROM events
-WHERE event_name = 'signup'
-GROUP BY signup_month
-ORDER BY signup_month;
+SELECT
+  visitortype,
+  COUNT(*) AS sessions,
+  ROUND(100.0 * AVG(revenue), 2) AS conversion_rate,
+  ROUND(AVG(pagevalues), 2) AS avg_page_value
+FROM sessions
+GROUP BY visitortype
+ORDER BY conversion_rate DESC;
 
--- Inactive users after first month
-SELECT user_id, MAX(event_time) AS last_seen
-FROM events
-GROUP BY user_id
-HAVING julianday('2025-10-01') - julianday(MAX(event_time)) > 30;
+SELECT
+  traffictype,
+  COUNT(*) AS sessions,
+  ROUND(100.0 * AVG(revenue), 2) AS conversion_rate,
+  ROUND(AVG(bouncerates), 4) AS avg_bounce_rate,
+  ROUND(AVG(exitrates), 4) AS avg_exit_rate
+FROM sessions
+GROUP BY traffictype
+ORDER BY sessions DESC;
