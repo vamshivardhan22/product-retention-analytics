@@ -1,43 +1,53 @@
-# Product/User Behavior Analytics Dashboard
+# Product Behavior and Conversion Analytics
 
-A professional user behavior analytics dashboard built on the real UCI **Online Shoppers Purchasing Intention** dataset.
-
-## Dataset
-
-Source: UCI Machine Learning Repository, Online Shoppers Purchasing Intention dataset.
-
-The data contains ecommerce browsing sessions with page counts, page durations, bounce rates, exit rates, page values, visitor type, traffic type, weekend flag, and purchase outcome.
-
-Important note: this dataset is session-level and does not include persistent user IDs or event timestamps. Because of that, the dashboard focuses on conversion behavior, engagement diagnostics, and funnel proxy analysis instead of pretending to perform true cohort retention.
+A Streamlit dashboard for exploring e-commerce session behavior and purchase conversion. The project uses product analytics metrics to compare visitor groups, traffic sources, engagement patterns, and conversion outcomes.
 
 ## Features
 
-- Conversion rate, sessions, conversions, average pages, duration, bounce rate, and exit rate.
-- Funnel proxy from all sessions to product browsing, high engagement, page value, and conversion.
-- Visitor type, traffic type, engagement band, and month-level analysis.
-- Behavior diagnostics for high-exit and high-bounce sessions.
-- SQL examples for analyst-style KPI validation.
+- Conversion rate, session counts, average pages viewed, session duration, bounce rate, and exit rate.
+- Funnel-style analysis of product browsing, engagement, page value, and conversion.
+- Breakdown by visitor type, traffic type, engagement band, and month.
+- Diagnostics for sessions with high bounce or exit rates.
+- SQL examples for validating conversion and behavior metrics.
 
-## Run Locally
+## Dataset
 
-```powershell
+The project uses the Online Shoppers Purchasing Intention dataset from the UCI Machine Learning Repository. It contains session-level attributes such as page counts, page durations, bounce and exit rates, page value, visitor type, traffic type, weekend flag, and purchase outcome.
+
+The dataset does not provide persistent user IDs or event timestamps. Therefore, the project analyzes session behavior and conversion patterns rather than claiming true user-level cohort retention.
+
+## Tech stack
+
+- Python
+- pandas
+- Streamlit
+- SQL
+
+## Run locally
+
+Requirements: Python and pip.
+
+```bash
+git clone https://github.com/vamshivardhan22/product-retention-analytics.git
+cd product-retention-analytics
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Portfolio Story
+## Project files
 
-This project answers product and growth questions:
+- `app.py` — Streamlit dashboard.
+- `data/online_shoppers_intention.csv` — cleaned session dataset.
+- `sql/retention_queries.sql` — SQL conversion and behavior queries.
+- `scripts/seed_data.py` — synthetic data generator.
 
-- Which visitor types convert best?
-- Which traffic types bring low-quality sessions?
-- How do page value, bounce rate, and exit rate relate to conversion?
+## Example questions
+
+- Which visitor types have higher conversion rates?
+- How does traffic source relate to conversion?
+- How do page value, bounce rate, and exit rate vary across sessions?
 - Where does the shopping journey appear to lose intent?
 
-## Project Files
+## Skills demonstrated
 
-- `app.py` - Streamlit product analytics dashboard.
-- `data/online_shoppers_intention.csv` - cleaned real session dataset.
-- `sql/retention_queries.sql` - SQL conversion and behavior queries.
-- `scripts/seed_data.py` - fallback synthetic event generator kept for reproducibility.
-
+Python, data analysis, product analytics, conversion funnel analysis, KPI reporting, SQL, and dashboard development.
